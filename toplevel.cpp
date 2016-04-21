@@ -17,6 +17,7 @@ MazewarInstance::Ptr M;
 /* Use this socket address to send packets to the multi-cast group. */
 static Sockaddr         groupAddr;
 #define MAX_OTHER_RATS  (MAX_RATS - 1)
+bool DEBUG = true;
 
 
 int main(int argc, char *argv[])
@@ -170,6 +171,49 @@ rightTurn(void)
 
 /* remember ... "North" is to the right ... positive X motion */
 
+
+
+
+// should be moved to somewhere else, for dev only.
+typedef	struct {
+    char type[4];
+    u_int8_t eventID;
+    u_int8_t score;
+    Loc x;
+    Loc y;
+    Direction d = M->dir();
+    u_int8_t missleCount; 
+    RatId sourceId;  
+}  Message;
+
+
+void sendPacketToAllPlayers()
+{
+    MW244BPacket pack;
+    Message* message = (Message *) &pack.body;
+    
+    // fullfill data;
+    strcpy( message->type,  "movement");
+    message->score = 3;
+    message->x = M->yloc();
+    message->y = M->xloc();
+    message->d = M->dir();
+    message->missleCount = 1;
+    message->sourceId = M->myRatId();
+
+    // debug info
+    if( DEBUG == true ){
+        cout << "sending data type " << message->type << endl;
+    }
+    
+    // multicast data
+    sendto(M->theSocket(), &pack, sizeof(pack), 0, (const struct sockaddr*)&groupAddr, sizeof(Sockaddr));
+    
+}
+
+
+
+
 void
 forward(void)
 {
@@ -189,6 +233,7 @@ forward(void)
 		M->ylocIs(Loc(ty));
 		updateView = TRUE;
 	}
+	sendPacketToAllPlayers();
 }
 
 /* ----------------------------------------------------------------------- */
@@ -499,6 +544,14 @@ void processPacket (MWEvent *eventPacket)
         case ...
 	}
 */
+    MW244BPacket*  pack = eventPacket->eventDetail;
+    Message* message = (Message*) &(pack->body);
+    if( DEBUG == true ){
+        cout << "x :" << message->x.value() << endl;
+        cout << "y :" << message->y.value() << endl;
+        cout << "dir :" << message->d.value() << endl;
+	cout << "sourceId :" << message->sourceId.value() << endl;
+    }
 
 }
 
@@ -522,6 +575,11 @@ netInit()
 	M->mazePortIs(htons(MAZEPORT));
 
 	gethostname(buf, sizeof(buf));
+
+	cout << "The host is ";
+	char* ip = inet_ntoa( thisHost->sin_addr );
+	//printf( "%s\n", resolveHost(buf) );
+	cout <<  ip;
 	if ((thisHost = resolveHost(buf)) == (Sockaddr *) NULL)
 	  MWError("who am I?");
 	bcopy((caddr_t) thisHost, (caddr_t) (M->myAddr()), sizeof(Sockaddr));
@@ -587,7 +645,7 @@ netInit()
            calls. */
 	memcpy(&groupAddr, &nullAddr, sizeof(Sockaddr));
 	groupAddr.sin_addr.s_addr = htonl(MAZEGROUP);
-
+        cout <<  "sam starts to send data " << endl;
 }
 
 
