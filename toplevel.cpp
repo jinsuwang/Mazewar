@@ -530,6 +530,16 @@ void sendPacketToPlayer(RatId ratId)
 /* ----------------------------------------------------------------------- */
 
 /* Sample of processPacket. */
+void printAllRateState(void){
+	for( int i = 0; i < MAX_RATS ; i++){
+		if(  M->rat(i).playing  ){
+			Rat tmp = M->rat(i);
+			cout<< "-------------------" << endl;
+			cout<< "index: " << i <<" x: " << tmp.x.value() << endl;
+		}
+	}
+}
+
 
 void processPacket (MWEvent *eventPacket)
 {
@@ -546,14 +556,49 @@ void processPacket (MWEvent *eventPacket)
 */
     MW244BPacket*  pack = eventPacket->eventDetail;
     Message* message = (Message*) &(pack->body);
-    if( DEBUG == true ){
+    /*if( DEBUG == true ){
         cout << "x :" << message->x.value() << endl;
         cout << "y :" << message->y.value() << endl;
         cout << "dir :" << message->d.value() << endl;
 	cout << "sourceId :" << message->sourceId.value() << endl;
+    }*/
+
+
+    /* --- update rat state --- */
+    SetRatPosition( message->sourceId.value(), message->x, message->y,  message->d );
+    
+    if( DEBUG ){
+ 	printAllRateState();
     }
 
+
 }
+
+
+
+/*  find first non occupied  index  */
+int findNextAvailableIndex(void)
+{
+	/*
+	for( int i = 0; i < MAX_RATS ; i++){
+		if(  M->rat(i).playing == false  ){
+			if( DEBUG == true){
+				cout << "the fitst available index is " << i << endl;
+			}
+			return i;
+		}
+	}
+	*/
+	int index = rand() % 8;
+	return index;
+}
+
+void joinGame(void)
+{
+	//TODO
+}
+
+
 
 /* ----------------------------------------------------------------------- */
 
@@ -576,10 +621,6 @@ netInit()
 
 	gethostname(buf, sizeof(buf));
 
-	cout << "The host is ";
-	char* ip = inet_ntoa( thisHost->sin_addr );
-	//printf( "%s\n", resolveHost(buf) );
-	cout <<  ip;
 	if ((thisHost = resolveHost(buf)) == (Sockaddr *) NULL)
 	  MWError("who am I?");
 	bcopy((caddr_t) thisHost, (caddr_t) (M->myAddr()), sizeof(Sockaddr));
@@ -633,19 +674,40 @@ netInit()
 	/*
 	 * Now we can try to find a game to join; if none, start one.
 	 */
-	 
-	printf("\n");
-
 	/* set up some stuff strictly for this local sample */
-	M->myRatIdIs(0);
+	//M->myRatIdIs(0);
+	//M->scoreIs(0);
+	//SetMyRatIndexType(0);
+
+	/* ------  Distributed version -----*/
+	/* this function should return the state of rats  */
+	joinGame();
+
+	/* find first availble ratIndex based on other rats state */
+	int nextAvailableIndex = findNextAvailableIndex();
+	if( nextAvailableIndex == -1){
+		//TODO, more than 8 players.
+	}
+	if( nextAvailableIndex  != 0 ){
+		ClearRatPosition(0);
+	}
+
+	if( DEBUG == true ){
+		cout << "The host is ";
+        	char* ip = inet_ntoa( thisHost->sin_addr );
+        	cout <<  ip << endl;
+	}
+
+
+	M->myRatIdIs(nextAvailableIndex);
 	M->scoreIs(0);
-	SetMyRatIndexType(0);
+	SetMyRatIndexType(nextAvailableIndex);
 
 	/* Get the multi-cast address ready to use in SendData()
            calls. */
 	memcpy(&groupAddr, &nullAddr, sizeof(Sockaddr));
 	groupAddr.sin_addr.s_addr = htonl(MAZEGROUP);
-        cout <<  "sam starts to send data " << endl;
+        cout <<  M->myRatId().value() <<  " starts to send data " << endl;
 }
 
 
